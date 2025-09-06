@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Omni Bot Controller</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background:white;
+            font-family: Arial, sans-serif;
+        }
+
+        .controller-box {
+            background: #000;
+            border-radius: 30px;
+            width: 600px;
+            max-width: 90%;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .top-section {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .joystick {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+        }
+
+        .stick {
+            width: 50px;
+            height: 50px;
+            background: #555;
+            border-radius: 50%;
+            position: absolute;
+            top: 35px;
+            left: 35px;
+            transition: top 0.05s, left 0.05s;
+        }
+
+        .status {
+            background: #111;
+            padding: 15px 20px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+            min-width: 180px;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .dpad button {
+            width: 60px;
+            height: 60px;
+           background-color: white;
+            color:#111;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .buttons-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .buttons-row button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            background:#fff ;
+            color: #444;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .buttons-row button:active {
+            background: #666;
+        }
+
+        .disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="controller-box">
+        <div class="top-section">
+            <div class="joystick disabled" id="joystick1">
+                <div class="stick"></div>
+            </div>
+
+            <div class="status" id="status">Status: Locked (Press Start)</div>
+
+            <div class="dpad">
+                <div></div>
+                <button id="upBtn" class="disabled">↑</button>
+                <div></div>
+                <button id="ccwBtn" class="disabled">⟲</button>
+                <div></div>
+                <button id="cwBtn" class="disabled">⟳</button>
+                <div></div>
+                <button id="downBtn" class="disabled">↓</button>
+                <div></div>
+            </div>
+        </div>
+
+        <div class="buttons-row">
+            <button id="startBtn">Start</button>
+            <button id="stopBtn">Stop</button>
+            <button id="wifiBtn">WiFi</button>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket(`ws://${window.location.hostname}:81/`);
+
+        const joystick = document.getElementById("joystick1");
+        const stick = joystick.querySelector(".stick");
+        const status = document.getElementById("status");
+        let dragging = false;
+        let controlsEnabled = false;
+
+        let currentK = 0.6;
+        let currentLevel = 2;
+
+        function updateStatus(mainText) {
+            if (controlsEnabled) {
+                status.innerHTML =
+                    `Status: ${mainText}<br>` +
+                    `Speed Level: ${currentLevel}<br>`;
+            } else {
+                status.innerHTML = `Status: ${mainText}`;
+            }
+        }
+
+        function resetStick() {
+            stick.style.left = "35px";
+            stick.style.top = "35px";
+        }
+
+        function moveStick(x, y) {
+            if (!controlsEnabled) return;
+            const rect = joystick.getBoundingClientRect();
+            const centerX = rect.width / 2 - stick.offsetWidth / 2;
+            const centerY = rect.height / 2 - stick.offsetHeight / 2;
+
+            let dx = x - rect.left - centerX - stick.offsetWidth / 2;
+            let dy = y - rect.top - centerY - stick.offsetHeight / 2;
+
+            const maxDist = 35;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > maxDist) {
+                dx = (dx * maxDist) / dist;
+                dy = (dy * maxDist) / dist;
+            }
+
+            stick.style.left = centerX + dx + "px";
+            stick.style.top = centerY + dy + "px";
+            updateStatus(`Joystick Active<br>dx=${dx.toFixed(0)}, dy=${-dy.toFixed(0)}`);
+
+            let a = Math.trunc((dx / maxDist) * 127);
+            let b = Math.trunc((-dy / maxDist) * 127);
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(`${a},${b}`);
+            }
+        }
+
+        // Joystick events
+        joystick.addEventListener("mousedown", () => {
+            if (controlsEnabled) dragging = true;
+        });
+        joystick.addEventListener("mouseup", () => {
+            if (controlsEnabled) {
+                dragging = false;
+                resetStick();
+                updateStatus("Idle");
+                ws.send("0,0");
+            }
+        });
+        joystick.addEventListener("mouseleave", () => {
+            if (controlsEnabled) {
+                dragging = false;
+                resetStick();
+                updateStatus("Idle");
+                ws.send("0,0");
+            }
+        });
+        joystick.addEventListener("mousemove", (e) => {
+            if (dragging && controlsEnabled) moveStick(e.clientX, e.clientY);
+        });
+        joystick.addEventListener("touchstart", () => {
+            if (controlsEnabled) dragging = true;
+        });
+        joystick.addEventListener("touchend", () => {
+            if (controlsEnabled) {
+                dragging = false;
+                resetStick();
+                updateStatus("Idle");
+                ws.send("0,0");
+            }
+        });
+        joystick.addEventListener("touchmove", (e) => {
+            if (dragging && controlsEnabled)
+                moveStick(e.touches[0].clientX, e.touches[0].clientY);
+        });
+        window.addEventListener("resize", resetStick);
+        resetStick();
+
+        // Button logic
+        function createButton(id, activeMessage) {
+            const btn = document.getElementById(id);
+            let interval = null;
+
+            const startAction = () => {
+                if (!controlsEnabled) return;
+                updateStatus(activeMessage);
+                ws.send(activeMessage);
+            };
+
+            const stopAction = () => {
+                ws.send("0,0");
+                clearInterval(interval);
+                interval = null;
+                if (controlsEnabled) updateStatus("Idle");
+            };
+
+            // btn.addEventListener("mousedown", startAction);
+            // btn.addEventListener("mouseup", stopAction);
+            // btn.addEventListener("mouseleave", stopAction);
+            btn.addEventListener("touchstart", startAction);
+            btn.addEventListener("touchend", stopAction);
+        }
+
+        createButton("cwBtn", "Rotating Clockwise");
+        createButton("ccwBtn", "Rotating Anticlockwise");
+        createButton("upBtn", "Speed UP");
+        createButton("downBtn", "Speed Down");
+
+        // Enable/Disable controls
+        function setControls(state) {
+            controlsEnabled = state;
+            const buttons = document.querySelectorAll(".dpad button, .joystick");
+            if (state) {
+                buttons.forEach((b) => b.classList.remove("disabled"));
+                updateStatus("Controls Enabled");
+            } else {
+                buttons.forEach((b) => b.classList.add("disabled"));
+                dragging = false;
+                resetStick();
+                status.innerHTML = "Status: Locked (Press Start)"; // hide speed
+            }
+        }
+
+        document.getElementById("startBtn").onclick = () => setControls(true);
+        document.getElementById("stopBtn").onclick = () => setControls(false);
+        document.getElementById("wifiBtn").onclick = () =>
+            updateStatus("WiFi Connecting...");
+
+        // Handle messages from ESP32
+        ws.onmessage = (event) => {
+            try {
+                const val = JSON.parse(event.data);
+                if (val.k !== undefined && val.level !== undefined) {
+                    currentK = parseFloat(val.k);
+                    currentLevel = val.level;
+                    if (controlsEnabled) updateStatus("Updated from ESP32");
+                }
+            } catch (e) {
+                console.log("Non-JSON message:", event.data);
+            }
+        };
+    </script>
+</body>
+
+</html>
