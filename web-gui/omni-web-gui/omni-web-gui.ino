@@ -12,7 +12,7 @@ const int motor1 = 12;
 const int motor2 = 23;
 const int motor3 = 33;
 const int motor1_dir = 13;
-const int motor2_dir = 22;
+const int motor2_dir = 15;
 const int motor3_dir = 32;
 
 WebServer server(80);
