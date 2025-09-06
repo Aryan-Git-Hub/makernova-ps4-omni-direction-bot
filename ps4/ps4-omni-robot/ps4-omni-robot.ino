@@ -84,12 +84,6 @@ void loop() {
     x *= front;
     y *= front;
 
-    float theta = (90.0f)*PI/2;
-    int temp_x = x; temp_y = y;
-    x = temp_x*cos(theta)+temp_y*sin(theta);
-    x = -temp_x*sin(theta)+temp_y*cos(theta);
-
-
     if (PS4.L1() && k > 0.3f) {
       k -= 0.1f;
       delay(delay_on_click);
