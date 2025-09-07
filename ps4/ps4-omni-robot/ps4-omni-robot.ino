@@ -19,7 +19,6 @@ int w1 = 0, w2 = 0, w3 = 0;                    // angular velocity of wheels
 int w1_dir = LOW, w2_dir = LOW, w3_dir = LOW;  // direction of each wheels
 int delay_on_click = 200;                      // delay after clicking on buttons
 int maxspeed = 200;                            // maxspeed to while we controlling bot by left arrows of ps4
-bool bno_rotation = false;                     // to function bno_rotation with the trigger button
 int front = 1;
 
 void setup() {
