@@ -1,5 +1,4 @@
 #include <PS4Controller.h>
-#include "Adafruit_BNO08x.h"
 #include <Wire.h>
 #include <math.h>
 
